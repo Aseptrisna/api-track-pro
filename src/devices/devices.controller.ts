@@ -16,6 +16,13 @@ export class DevicesController {
     return this.devicesService.create(dto, user.userId);
   }
 
+
+  @Get('/all')
+  @ApiOperation({ summary: 'Get all devices (no filter)' })
+  findAllDevices() {
+    return this.devicesService.findAllDevices();
+  }
+
   @Get() @ApiOperation({ summary: 'Get all devices' })
   findAll(@CurrentUser() user: any, @Query('page') page?: number, @Query('limit') limit?: number, @Query('search') search?: string) {
     return this.devicesService.findAll(user.userId, page || 1, limit || 10, search);
@@ -38,7 +45,7 @@ export class DevicesController {
 
   @Get('/all')
   @ApiOperation({ summary: 'Get all devices (no filter)' })
-  findAllDevices() {
+  findAllDevice() {
     return this.devicesService.findAllDevices();
   }
 
