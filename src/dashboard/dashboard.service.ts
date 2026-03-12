@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import { Vehicle } from '../vehicles/schemas/vehicle.schema';
 import { ShipmentsService } from '../shipments/shipments.service';
 import { DevicesService } from '../devices/devices.service';
@@ -14,18 +14,17 @@ export class DashboardService {
   ) {}
 
   async getStats(ownerId: string) {
-    const [totalVehicles, onlineDevices, activeShipments, todayDeliveries] = await Promise.all([
-      this.vehicleModel.countDocuments({ owner: ownerId }),
-      this.devicesService.countOnline(),
-      this.shipmentsService.countByStatus('in_transit'),
-      this.shipmentsService.countToday(),
+    const ownerOid = new Types.ObjectId(ownerId);
+    const [totalVehicles, onlineDevices] = await Promise.all([
+      this.vehicleModel.countDocuments({ owner: ownerOid }),
+      this.devicesService.countOnlineByOwner(ownerId),
     ]);
-    return { totalVehicles, onlineDevices, activeShipments, todayDeliveries };
+    return { totalVehicles, onlineDevices };
   }
 
   async getFleetUsage(ownerId: string) {
     const result = await this.vehicleModel.aggregate([
-      { $match: { owner: ownerId } },
+      { $match: { owner: new Types.ObjectId(ownerId) } },
       { $group: { _id: '$vehicle_type', count: { $sum: 1 } } },
       { $sort: { count: -1 } },
     ]);
@@ -33,8 +32,8 @@ export class DashboardService {
   }
 
   async getVehicleActivity(ownerId: string) {
+    const totalVehicles = await this.vehicleModel.countDocuments({ owner: new Types.ObjectId(ownerId) });
     const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-    const totalVehicles = await this.vehicleModel.countDocuments({ owner: ownerId });
     return days.map(day => ({
       day,
       active: Math.min(Math.floor(Math.random() * (totalVehicles || 5)) + 1, totalVehicles || 5),

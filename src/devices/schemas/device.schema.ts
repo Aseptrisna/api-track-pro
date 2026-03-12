@@ -3,6 +3,9 @@ import { Types } from 'mongoose';
 
 @Schema({ timestamps: true, versionKey: false })
 export class Device {
+  @Prop({ type: Types.ObjectId, ref: 'User', required: true, index: true })
+  owner: Types.ObjectId;
+
   @Prop({ required: true, unique: true })
   imei: string;
 

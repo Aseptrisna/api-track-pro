@@ -38,6 +38,7 @@ const VehicleSchema = new mongoose.Schema(
 
 const DeviceSchema = new mongoose.Schema(
   {
+    owner: { type: mongoose.Types.ObjectId, ref: 'User', index: true },
     imei: { type: String, unique: true },
     device_name: String,
     vehicle_id: { type: mongoose.Types.ObjectId, ref: 'Vehicle' },
@@ -284,6 +285,7 @@ async function seed() {
     const device = await Device.create({
       ...devicesData[i],
       vehicle_id: vehicle._id,
+      owner: user._id,
       status: 'online',
       last_seen: new Date(),
     });

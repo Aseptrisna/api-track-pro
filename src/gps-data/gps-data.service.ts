@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { GpsData } from './schemas/gps-data.schema';
@@ -27,7 +27,7 @@ export class GpsDataService {
   }
 
   async getLatestByVehicle(vehicleId: string): Promise<GpsData | null> {
-    return this.gpsDataModel.findOne({ vehicle_id: vehicleId }).sort({ timestamp: -1 }).exec();
+    return this.gpsDataModel.findOne({ vehicle_id: new Types.ObjectId(vehicleId) }).sort({ timestamp: -1 }).exec();
   }
 
   async getHistory(imei: string, startDate: Date, endDate: Date): Promise<GpsData[]> {
@@ -39,7 +39,7 @@ export class GpsDataService {
 
   async getVehicleHistory(vehicleId: string, startDate: Date, endDate: Date): Promise<GpsData[]> {
     return this.gpsDataModel.find({
-      vehicle_id: vehicleId,
+      vehicle_id: new Types.ObjectId(vehicleId),
       timestamp: { $gte: startDate, $lte: endDate },
     }).sort({ timestamp: 1 }).exec();
   }
@@ -52,7 +52,6 @@ export class GpsDataService {
     ]);
   }
 
-  // Get latest GPS positions filtered by owner's vehicles only
   async getAllLatestByOwner(ownerId: string): Promise<GpsData[]> {
     const vehicles = await this.vehiclesService.getAllByOwner(ownerId);
     const vehicleIds = vehicles.map((v: any) => new Types.ObjectId(String(v._id)));
@@ -65,5 +64,13 @@ export class GpsDataService {
       { $group: { _id: '$vehicle_id', doc: { $first: '$$ROOT' } } },
       { $replaceRoot: { newRoot: '$doc' } },
     ]);
+  }
+
+  async verifyVehicleOwnership(vehicleId: string, ownerId: string): Promise<void> {
+    try {
+      await this.vehiclesService.findById(vehicleId, ownerId);
+    } catch {
+      throw new ForbiddenException('Vehicle not found or access denied');
+    }
   }
 }

@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { DevicesService } from './devices.service';
 import { CreateDeviceDto } from './dto/create-device.dto';
 import { UpdateDeviceDto } from './dto/update-device.dto';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @ApiTags('Devices')
 @ApiBearerAuth()
@@ -11,19 +12,27 @@ export class DevicesController {
   constructor(private readonly devicesService: DevicesService) {}
 
   @Post() @ApiOperation({ summary: 'Register device' })
-  create(@Body() dto: CreateDeviceDto) { return this.devicesService.create(dto); }
+  create(@Body() dto: CreateDeviceDto, @CurrentUser() user: any) {
+    return this.devicesService.create(dto, user.userId);
+  }
 
   @Get() @ApiOperation({ summary: 'Get all devices' })
-  findAll(@Query('page') page?: number, @Query('limit') limit?: number, @Query('search') search?: string) {
-    return this.devicesService.findAll(page || 1, limit || 10, search);
+  findAll(@CurrentUser() user: any, @Query('page') page?: number, @Query('limit') limit?: number, @Query('search') search?: string) {
+    return this.devicesService.findAll(user.userId, page || 1, limit || 10, search);
   }
 
   @Get(':id') @ApiOperation({ summary: 'Get device by ID' })
-  findOne(@Param('id') id: string) { return this.devicesService.findById(id); }
+  findOne(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.devicesService.findById(id, user.userId);
+  }
 
   @Put(':id') @ApiOperation({ summary: 'Update device' })
-  update(@Param('id') id: string, @Body() dto: UpdateDeviceDto) { return this.devicesService.update(id, dto); }
+  update(@Param('id') id: string, @Body() dto: UpdateDeviceDto, @CurrentUser() user: any) {
+    return this.devicesService.update(id, dto, user.userId);
+  }
 
   @Delete(':id') @ApiOperation({ summary: 'Delete device' })
-  remove(@Param('id') id: string) { return this.devicesService.remove(id); }
+  remove(@Param('id') id: string, @CurrentUser() user: any) {
+    return this.devicesService.remove(id, user.userId);
+  }
 }

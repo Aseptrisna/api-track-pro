@@ -37,12 +37,21 @@ export class GpsDataController {
   @ApiBearerAuth()
   @Get('vehicle/:vehicleId')
   @ApiOperation({ summary: 'Get latest by vehicle' })
-  getByVehicle(@Param('vehicleId') vehicleId: string) { return this.gpsDataService.getLatestByVehicle(vehicleId); }
+  async getByVehicle(@Param('vehicleId') vehicleId: string, @CurrentUser() user: any) {
+    await this.gpsDataService.verifyVehicleOwnership(vehicleId, user.userId);
+    return this.gpsDataService.getLatestByVehicle(vehicleId);
+  }
 
   @ApiBearerAuth()
   @Get('vehicle-history/:vehicleId')
   @ApiOperation({ summary: 'Get vehicle GPS history' })
-  getVehicleHistory(@Param('vehicleId') vehicleId: string, @Query('start') start: string, @Query('end') end: string) {
-    return this.gpsDataService.getVehicleHistory(vehicleId, new Date(start), new Date(end));
+  async getVehicleHistory(
+    @Param('vehicleId') vehicleId: string,
+    @CurrentUser() user: any,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+  ) {
+    await this.gpsDataService.verifyVehicleOwnership(vehicleId, user.userId);
+    return this.gpsDataService.getVehicleHistory(vehicleId, new Date(startDate), new Date(endDate));
   }
 }
