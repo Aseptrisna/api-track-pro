@@ -5,12 +5,14 @@ import { GpsDataService } from './gps-data.service';
 import { GpsDataController } from './gps-data.controller';
 import { DevicesModule } from '../devices/devices.module';
 import { VehiclesModule } from '../vehicles/vehicles.module';
+import { TrackingModule } from '../tracking/tracking.module';
 
 @Module({
   imports: [
     MongooseModule.forFeature([{ name: GpsData.name, schema: GpsDataSchema }]),
     DevicesModule,
     VehiclesModule,
+    TrackingModule,
   ],
   controllers: [GpsDataController],
   providers: [GpsDataService],

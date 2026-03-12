@@ -1,6 +1,5 @@
 import { WebSocketGateway, WebSocketServer, SubscribeMessage, OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { GpsDataService } from '../gps-data/gps-data.service';
 
 @WebSocketGateway({
   cors: { origin: '*' },
@@ -8,8 +7,6 @@ import { GpsDataService } from '../gps-data/gps-data.service';
 })
 export class TrackingGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer() server: Server;
-
-  constructor(private gpsDataService: GpsDataService) {}
 
   handleConnection(client: Socket) {
     console.log(`Client connected: ${client.id}`);

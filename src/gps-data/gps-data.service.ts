@@ -5,6 +5,7 @@ import { GpsData } from './schemas/gps-data.schema';
 import { CreateGpsDataDto } from './dto/create-gps-data.dto';
 import { DevicesService } from '../devices/devices.service';
 import { VehiclesService } from '../vehicles/vehicles.service';
+import { TrackingGateway } from '../tracking/tracking.gateway';
 
 @Injectable()
 export class GpsDataService {
@@ -12,6 +13,7 @@ export class GpsDataService {
     @InjectModel(GpsData.name) private gpsDataModel: Model<GpsData>,
     private devicesService: DevicesService,
     private vehiclesService: VehiclesService,
+    private trackingGateway: TrackingGateway,
   ) {}
 
   async create(dto: CreateGpsDataDto): Promise<GpsData> {
@@ -19,7 +21,21 @@ export class GpsDataService {
     const data: any = { ...dto };
     if (device?.vehicle_id) data.vehicle_id = device.vehicle_id;
     await this.devicesService.updateStatus(dto.imei, 'online');
-    return this.gpsDataModel.create(data);
+    const saved = await this.gpsDataModel.create(data);
+
+    // Broadcast to WebSocket clients
+    this.trackingGateway.emitLocationUpdate({
+      _id: saved._id,
+      imei: saved.imei,
+      vehicle_id: saved.vehicle_id?.toString() || null,
+      latitude: saved.latitude,
+      longitude: saved.longitude,
+      speed: saved.speed || 0,
+      course: saved.course || 0,
+      timestamp: saved.timestamp,
+    });
+
+    return saved;
   }
 
   async getLatestByImei(imei: string): Promise<GpsData | null> {
