@@ -35,4 +35,16 @@ export class DevicesController {
   remove(@Param('id') id: string, @CurrentUser() user: any) {
     return this.devicesService.remove(id, user.userId);
   }
+
+  @Get('/all')
+  @ApiOperation({ summary: 'Get all devices (no filter)' })
+  findAllDevices() {
+    return this.devicesService.findAllDevices();
+  }
+
+  @Delete('/imei/:imei')
+  @ApiOperation({ summary: 'Delete device by IMEI' })
+  removeByImei(@Param('imei') imei: string) {
+    return this.devicesService.removeByImei(imei);
+  }
 }

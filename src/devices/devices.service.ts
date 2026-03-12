@@ -56,4 +56,15 @@ export class DevicesService {
   async countOnlineByOwner(ownerId: string): Promise<number> {
     return this.deviceModel.countDocuments({ owner: new Types.ObjectId(ownerId), status: 'online' });
   }
+  
+  // Get all devices without any filter
+  async findAllDevices(): Promise<Device[]> {
+    return this.deviceModel.find().populate('vehicle_id').exec();
+  }
+  
+  // Delete device by IMEI
+  async removeByImei(imei: string): Promise<void> {
+    const r = await this.deviceModel.findOneAndDelete({ imei });
+    if (!r) throw new NotFoundException('Device not found');
+  }
 }
