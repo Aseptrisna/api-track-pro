@@ -4,17 +4,26 @@ import { VehiclesService } from './vehicles.service';
 import { CreateVehicleDto } from './dto/create-vehicle.dto';
 import { UpdateVehicleDto } from './dto/update-vehicle.dto';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import { ActivityLogService } from '../activity-log/activity-log.service';
 
 @ApiTags('Vehicles')
 @ApiBearerAuth()
 @Controller('vehicles')
 export class VehiclesController {
-  constructor(private readonly vehiclesService: VehiclesService) {}
+  constructor(
+    private readonly vehiclesService: VehiclesService,
+    private readonly activityLogService: ActivityLogService,
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Create vehicle' })
-  create(@Body() dto: CreateVehicleDto, @CurrentUser() user: any) {
-    return this.vehiclesService.create(dto, user.userId);
+  async create(@Body() dto: CreateVehicleDto, @CurrentUser() user: any) {
+    const vehicle = await this.vehiclesService.create(dto, user.userId);
+    this.activityLogService.log(
+      user.userId, 'created', 'Vehicles',
+      `Added vehicle "${dto.vehicle_name}" (${dto.plate_number})`,
+    );
+    return vehicle;
   }
 
   @Get()
@@ -33,13 +42,22 @@ export class VehiclesController {
 
   @Put(':id')
   @ApiOperation({ summary: 'Update vehicle' })
-  update(@Param('id') id: string, @Body() dto: UpdateVehicleDto, @CurrentUser() user: any) {
-    return this.vehiclesService.update(id, dto, user.userId);
+  async update(@Param('id') id: string, @Body() dto: UpdateVehicleDto, @CurrentUser() user: any) {
+    const vehicle = await this.vehiclesService.update(id, dto, user.userId);
+    this.activityLogService.log(
+      user.userId, 'updated', 'Vehicles',
+      `Updated vehicle "${vehicle.vehicle_name}" (${vehicle.plate_number})`,
+    );
+    return vehicle;
   }
 
   @Delete(':id')
   @ApiOperation({ summary: 'Delete vehicle' })
-  remove(@Param('id') id: string, @CurrentUser() user: any) {
-    return this.vehiclesService.remove(id, user.userId);
+  async remove(@Param('id') id: string, @CurrentUser() user: any) {
+    await this.vehiclesService.remove(id, user.userId);
+    this.activityLogService.log(
+      user.userId, 'deleted', 'Vehicles',
+      `Deleted vehicle ID: ${id}`,
+    );
   }
 }

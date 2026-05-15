@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Vehicle } from '../vehicles/schemas/vehicle.schema';
+import { Driver } from '../drivers/schemas/driver.schema';
 import { ShipmentsService } from '../shipments/shipments.service';
 import { DevicesService } from '../devices/devices.service';
 
@@ -9,17 +10,54 @@ import { DevicesService } from '../devices/devices.service';
 export class DashboardService {
   constructor(
     @InjectModel(Vehicle.name) private vehicleModel: Model<Vehicle>,
+    @InjectModel(Driver.name) private driverModel: Model<Driver>,
     private shipmentsService: ShipmentsService,
     private devicesService: DevicesService,
   ) {}
 
   async getStats(ownerId: string) {
     const ownerOid = new Types.ObjectId(ownerId);
-    const [totalVehicles, onlineDevices] = await Promise.all([
+    const now = new Date();
+    const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    const [
+      totalVehicles, onlineDevices, totalDrivers,
+      pendingShipments, activeShipments,
+      serviceOverdue, docsExpiringSoon, licensesExpiringSoon,
+    ] = await Promise.all([
       this.vehicleModel.countDocuments({ owner: ownerOid }),
       this.devicesService.countOnlineByOwner(ownerId),
+      this.driverModel.countDocuments({ status: { $ne: 'inactive' } }),
+      this.shipmentsService.countByStatus('pending'),
+      this.shipmentsService.countByStatus('in_transit'),
+      // Vehicles with service overdue
+      this.vehicleModel.countDocuments({
+        owner: ownerOid,
+        $or: [
+          { next_service_date: { $lt: now } },
+          { $expr: { $and: [{ $gt: ['$odometer', 0] }, { $lte: ['$next_service_km', '$odometer'] }] } },
+        ],
+      }),
+      // Vehicles with any doc expiring in 30 days
+      this.vehicleModel.countDocuments({
+        owner: ownerOid,
+        $or: [
+          { stnk_expiry:      { $exists: true, $ne: null, $lte: in30Days } },
+          { kir_expiry:       { $exists: true, $ne: null, $lte: in30Days } },
+          { insurance_expiry: { $exists: true, $ne: null, $lte: in30Days } },
+        ],
+      }),
+      // Drivers with license expiring in 30 days
+      this.driverModel.countDocuments({
+        license_expiry_date: { $exists: true, $ne: null, $lte: in30Days },
+      }),
     ]);
-    return { totalVehicles, onlineDevices };
+
+    return {
+      totalVehicles, onlineDevices, totalDrivers,
+      pendingShipments, activeShipments,
+      serviceOverdue, docsExpiringSoon, licensesExpiringSoon,
+    };
   }
 
   async getFleetUsage(ownerId: string) {

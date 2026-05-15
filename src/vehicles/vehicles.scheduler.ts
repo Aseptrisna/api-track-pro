@@ -82,4 +82,48 @@ export class VehiclesScheduler {
 
     this.logger.log(`Service due check complete — checked ${vehicles.length} vehicle(s)`);
   }
+
+  /** Runs daily at 08:15 — checks STNK, KIR, insurance expiry */
+  @Cron('15 8 * * *')
+  async checkDocumentExpiry(): Promise<void> {
+    const now = new Date();
+    const in30Days = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+    const docFields: { field: keyof Vehicle; label: string }[] = [
+      { field: 'stnk_expiry',      label: 'STNK' },
+      { field: 'kir_expiry',       label: 'KIR' },
+      { field: 'insurance_expiry', label: 'Asuransi' },
+    ];
+
+    for (const { field, label } of docFields) {
+      const vehicles = await this.vehicleModel.find({
+        owner: { $exists: true },
+        [field]: { $exists: true, $ne: null, $lte: in30Days },
+      }).exec();
+
+      for (const vehicle of vehicles) {
+        const expiryDate = new Date((vehicle as any)[field]);
+        const isExpired = expiryDate < now;
+        const daysLeft = Math.ceil((expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+        const ownerId = vehicle.owner.toString();
+
+        const title = isExpired
+          ? `${label} kadaluarsa: ${vehicle.vehicle_name}`
+          : `${label} akan kadaluarsa: ${vehicle.vehicle_name}`;
+
+        const message = isExpired
+          ? `${label} kendaraan "${vehicle.vehicle_name}" (${vehicle.plate_number}) sudah kadaluarsa pada ${expiryDate.toLocaleDateString('id-ID')}.`
+          : `${label} kendaraan "${vehicle.vehicle_name}" (${vehicle.plate_number}) akan kadaluarsa dalam ${daysLeft} hari (${expiryDate.toLocaleDateString('id-ID')}).`;
+
+        await this.notificationsService.create({
+          title,
+          message,
+          type: isExpired ? 'alert' : 'warning',
+          user: ownerId,
+        }).catch(() => {});
+      }
+    }
+
+    this.logger.log('Document expiry check complete');
+  }
 }

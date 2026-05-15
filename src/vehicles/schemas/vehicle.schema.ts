@@ -73,6 +73,16 @@ export class Vehicle {
 
   @Prop()
   service_notes: string;
+
+  // ── Legal documents ───────────────────────────────────────────────────────
+  @Prop()
+  stnk_expiry: Date;
+
+  @Prop()
+  kir_expiry: Date;
+
+  @Prop()
+  insurance_expiry: Date;
 }
 
 export const VehicleSchema = SchemaFactory.createForClass(Vehicle);

@@ -17,6 +17,15 @@ export class Driver {
 
   @Prop({ type: Types.ObjectId, ref: 'Vehicle' })
   assigned_vehicle: Types.ObjectId;
+
+  @Prop()
+  license_expiry_date: Date;
+
+  @Prop()
+  address: string;
+
+  @Prop()
+  notes: string;
 }
 
 export const DriverSchema = SchemaFactory.createForClass(Driver);

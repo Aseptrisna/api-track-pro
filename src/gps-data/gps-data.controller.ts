@@ -54,4 +54,19 @@ export class GpsDataController {
     await this.gpsDataService.verifyVehicleOwnership(vehicleId, user.userId);
     return this.gpsDataService.getVehicleHistory(vehicleId, new Date(startDate), new Date(endDate));
   }
+
+  @ApiBearerAuth()
+  @Get('trips/:vehicleId')
+  @ApiOperation({ summary: 'Detect and return trip segments for a vehicle' })
+  async getTrips(
+    @Param('vehicleId') vehicleId: string,
+    @CurrentUser() user: any,
+    @Query('startDate') startDate: string,
+    @Query('endDate')   endDate: string,
+  ) {
+    await this.gpsDataService.verifyVehicleOwnership(vehicleId, user.userId);
+    const start = startDate ? new Date(startDate) : (() => { const d = new Date(); d.setDate(d.getDate() - 7); return d; })();
+    const end   = endDate   ? new Date(endDate)   : new Date();
+    return this.gpsDataService.detectTrips(vehicleId, start, end);
+  }
 }

@@ -208,4 +208,91 @@ export class GpsDataService {
       throw new ForbiddenException('Vehicle not found or access denied');
     }
   }
+
+  // ── Trip detection ──────────────────────────────────────────────────────────
+  private haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+    const R = 6371;
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a =
+      Math.sin(dLat / 2) ** 2 +
+      Math.cos(lat1 * (Math.PI / 180)) *
+      Math.cos(lat2 * (Math.PI / 180)) *
+      Math.sin(dLon / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  }
+
+  async detectTrips(vehicleId: string, startDate: Date, endDate: Date) {
+    const IDLE_GAP_MS   = 5 * 60 * 1000;  // 5-minute gap = trip boundary
+    const MIN_POINTS    = 3;               // minimum GPS points for a valid trip
+    const MIN_DIST_KM   = 0.1;            // minimum 100m to count as a trip
+
+    const points = await this.gpsDataModel.find({
+      vehicle_id: new Types.ObjectId(vehicleId),
+      timestamp: { $gte: startDate, $lte: endDate },
+    }).sort({ timestamp: 1 }).lean().exec();
+
+    if (points.length < MIN_POINTS) return [];
+
+    const trips: any[] = [];
+    let segment: typeof points = [points[0]];
+
+    for (let i = 1; i < points.length; i++) {
+      const gap = new Date(points[i].timestamp).getTime() - new Date(points[i - 1].timestamp).getTime();
+      if (gap > IDLE_GAP_MS) {
+        // Close current segment, open new one
+        if (segment.length >= MIN_POINTS) trips.push(this.buildTrip(segment, MIN_DIST_KM));
+        segment = [points[i]];
+      } else {
+        segment.push(points[i]);
+      }
+    }
+    // Flush last segment
+    if (segment.length >= MIN_POINTS) trips.push(this.buildTrip(segment, MIN_DIST_KM));
+
+    return trips.filter(Boolean);
+  }
+
+  private buildTrip(points: any[], minDistKm: number) {
+    let distKm = 0;
+    let maxSpeed = 0;
+    let speedSum = 0;
+    let movingPoints = 0;
+
+    for (let i = 1; i < points.length; i++) {
+      distKm += this.haversineKm(
+        points[i - 1].latitude, points[i - 1].longitude,
+        points[i].latitude,     points[i].longitude,
+      );
+    }
+    for (const p of points) {
+      const s = p.speed ?? 0;
+      if (s > maxSpeed) maxSpeed = s;
+      if (s > 0) { speedSum += s; movingPoints++; }
+    }
+    if (distKm < minDistKm) return null;
+
+    const startTime = new Date(points[0].timestamp);
+    const endTime   = new Date(points[points.length - 1].timestamp);
+    const durationMin = Math.round((endTime.getTime() - startTime.getTime()) / 60000);
+
+    return {
+      startTime:    startTime.toISOString(),
+      endTime:      endTime.toISOString(),
+      durationMin,
+      distanceKm:   Math.round(distKm * 100) / 100,
+      avgSpeedKmh:  movingPoints > 0 ? Math.round(speedSum / movingPoints) : 0,
+      maxSpeedKmh:  Math.round(maxSpeed),
+      pointCount:   points.length,
+      startLat:     points[0].latitude,
+      startLng:     points[0].longitude,
+      endLat:       points[points.length - 1].latitude,
+      endLng:       points[points.length - 1].longitude,
+      // Sampled path for map display (max 200 points)
+      path: points.length > 200
+        ? points.filter((_, i) => i % Math.ceil(points.length / 200) === 0)
+            .map((p) => [p.latitude, p.longitude])
+        : points.map((p) => [p.latitude, p.longitude]),
+    };
+  }
 }

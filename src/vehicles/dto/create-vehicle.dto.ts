@@ -21,4 +21,9 @@ export class CreateVehicleDto {
   @ApiPropertyOptional({ description: 'Scheduled next service date' }) @IsOptional() @IsDateString() next_service_date?: string;
   @ApiPropertyOptional({ description: 'Odometer threshold for next service' }) @IsOptional() @IsNumber() next_service_km?: number;
   @ApiPropertyOptional({ description: 'Service notes' }) @IsOptional() @IsString() service_notes?: string;
+
+  // Legal documents
+  @ApiPropertyOptional({ description: 'STNK expiry date' }) @IsOptional() @IsDateString() stnk_expiry?: string;
+  @ApiPropertyOptional({ description: 'KIR expiry date' }) @IsOptional() @IsDateString() kir_expiry?: string;
+  @ApiPropertyOptional({ description: 'Insurance expiry date' }) @IsOptional() @IsDateString() insurance_expiry?: string;
 }

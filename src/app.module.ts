@@ -22,6 +22,8 @@ import { ReportsModule } from './reports/reports.module';
 import { MailModule } from './mail/mail.module';
 import { GeofenceModule } from './geofence/geofence.module';
 import { ActivityLogModule } from './activity-log/activity-log.module';
+import { FuelLogsModule } from './fuel-logs/fuel-logs.module';
+import { MaintenanceModule } from './maintenance/maintenance.module';
 
 @Module({
   imports: [
@@ -47,6 +49,8 @@ import { ActivityLogModule } from './activity-log/activity-log.module';
     MailModule,
     GeofenceModule,
     ActivityLogModule,
+    FuelLogsModule,
+    MaintenanceModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
