@@ -7,6 +7,7 @@ import { DevicesModule } from '../devices/devices.module';
 import { VehiclesModule } from '../vehicles/vehicles.module';
 import { TrackingModule } from '../tracking/tracking.module';
 import { GeofenceModule } from '../geofence/geofence.module';
+import { ViolationsModule } from '../violations/violations.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { GeofenceModule } from '../geofence/geofence.module';
     VehiclesModule,
     TrackingModule,
     GeofenceModule,
+    ViolationsModule,
   ],
   controllers: [GpsDataController],
   providers: [GpsDataService],

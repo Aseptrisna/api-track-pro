@@ -8,6 +8,7 @@ import { VehiclesService } from '../vehicles/vehicles.service';
 import { TrackingGateway } from '../tracking/tracking.gateway';
 import { GeofenceService } from '../geofence/geofence.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { ViolationsService } from '../violations/violations.service';
 
 const DEFAULT_SPEED_LIMIT = 80; // km/h
 const SPEED_ALERT_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes per device
@@ -23,6 +24,7 @@ export class GpsDataService {
     private trackingGateway: TrackingGateway,
     private geofenceService: GeofenceService,
     private notificationsService: NotificationsService,
+    private violationsService: ViolationsService,
   ) {}
 
   async create(dto: CreateGpsDataDto): Promise<GpsData> {
@@ -60,14 +62,18 @@ export class GpsDataService {
         saved.longitude,
       ).catch(() => { /* non-blocking */ });
 
-      this.checkSpeedViolation(device, saved.speed || 0)
+      this.checkSpeedViolation(device, saved.speed || 0, saved)
         .catch(() => { /* non-blocking */ });
     }
 
     return saved;
   }
 
-  private async checkSpeedViolation(device: any, speed: number): Promise<void> {
+  private async checkSpeedViolation(
+    device: any,
+    speed: number,
+    savedPoint: GpsData,
+  ): Promise<void> {
     if (speed <= 0) return;
 
     const vehicle = device.vehicle_id as any;
@@ -75,7 +81,23 @@ export class GpsDataService {
 
     if (speed <= speedLimit) return;
 
-    // Cooldown: skip if a speed alert was already sent in the last 10 minutes
+    const ownerId = device.owner?.toString();
+
+    // Always persist a violation record (per GPS point over limit)
+    await this.violationsService
+      .log({
+        vehicle: vehicle?._id?.toString() ?? vehicle?.toString(),
+        imei: device.imei,
+        timestamp: savedPoint.timestamp,
+        speed,
+        speed_limit: speedLimit,
+        latitude: savedPoint.latitude,
+        longitude: savedPoint.longitude,
+        owner: ownerId,
+      })
+      .catch(() => null);
+
+    // Cooldown: throttle notifications to once per 10 minutes per device
     const lastAlert = this.speedAlertCooldown.get(device.imei) ?? 0;
     if (Date.now() - lastAlert < SPEED_ALERT_COOLDOWN_MS) return;
 
@@ -84,8 +106,6 @@ export class GpsDataService {
     const vehicleLabel = vehicle?.plate_number
       ? `${vehicle.vehicle_name} (${vehicle.plate_number})`
       : `device ${device.imei}`;
-
-    const ownerId = device.owner?.toString();
 
     await this.notificationsService.create({
       title: 'Speed limit exceeded',
