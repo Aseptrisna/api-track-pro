@@ -4,10 +4,14 @@ import { Model } from 'mongoose';
 import { Shipment } from './schemas/shipment.schema';
 import { CreateShipmentDto } from './dto/create-shipment.dto';
 import { UpdateShipmentDto } from './dto/update-shipment.dto';
+import { NotificationsService } from '../notifications/notifications.service';
 
 @Injectable()
 export class ShipmentsService {
-  constructor(@InjectModel(Shipment.name) private shipmentModel: Model<Shipment>) {}
+  constructor(
+    @InjectModel(Shipment.name) private shipmentModel: Model<Shipment>,
+    private notificationsService: NotificationsService,
+  ) {}
 
   async create(dto: CreateShipmentDto): Promise<Shipment> { return this.shipmentModel.create(dto); }
 
@@ -29,10 +33,23 @@ export class ShipmentsService {
     return s;
   }
 
-  async update(id: string, dto: UpdateShipmentDto): Promise<Shipment> {
-    const s = await this.shipmentModel.findByIdAndUpdate(id, dto, { new: true });
-    if (!s) throw new NotFoundException('Shipment not found');
-    return s;
+  async update(id: string, dto: UpdateShipmentDto, userId?: string): Promise<Shipment> {
+    const prev = await this.shipmentModel.findById(id);
+    if (!prev) throw new NotFoundException('Shipment not found');
+
+    const updated = await this.shipmentModel.findByIdAndUpdate(id, dto, { new: true });
+    if (!updated) throw new NotFoundException('Shipment not found');
+
+    if (dto.status === 'delivered' && prev.status !== 'delivered') {
+      await this.notificationsService.create({
+        title: 'Shipment delivered',
+        message: `Shipment ${updated.shipment_code} from ${updated.origin} to ${updated.destination} has been delivered.`,
+        type: 'success',
+        user: userId,
+      });
+    }
+
+    return updated;
   }
 
   async remove(id: string): Promise<void> {

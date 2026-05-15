@@ -29,7 +29,12 @@ export class NotificationsService {
     return this.notificationModel.updateMany({ user: new Types.ObjectId(userId), read_status: false }, { read_status: true });
   }
 
-  async getUnreadCount(userId: string): Promise<number> {
-    return this.notificationModel.countDocuments({ user: new Types.ObjectId(userId), read_status: false });
+  async delete(id: string) {
+    return this.notificationModel.findByIdAndDelete(id);
+  }
+
+  async getUnreadCount(userId: string): Promise<{ count: number }> {
+    const count = await this.notificationModel.countDocuments({ user: new Types.ObjectId(userId), read_status: false });
+    return { count };
   }
 }

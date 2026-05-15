@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
 import { ShipmentsService } from './shipments.service';
 import { CreateShipmentDto } from './dto/create-shipment.dto';
 import { UpdateShipmentDto } from './dto/update-shipment.dto';
+import { CurrentUser } from '../common/decorators/current-user.decorator';
 
 @ApiTags('Shipments')
 @ApiBearerAuth()
@@ -22,7 +23,9 @@ export class ShipmentsController {
   findOne(@Param('id') id: string) { return this.shipmentsService.findById(id); }
 
   @Put(':id') @ApiOperation({ summary: 'Update shipment' })
-  update(@Param('id') id: string, @Body() dto: UpdateShipmentDto) { return this.shipmentsService.update(id, dto); }
+  update(@Param('id') id: string, @Body() dto: UpdateShipmentDto, @CurrentUser() user: any) {
+    return this.shipmentsService.update(id, dto, user?.userId);
+  }
 
   @Delete(':id') @ApiOperation({ summary: 'Delete shipment' })
   remove(@Param('id') id: string) { return this.shipmentsService.remove(id); }

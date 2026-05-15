@@ -51,6 +51,9 @@ export class Vehicle {
 
   @Prop({ type: Types.ObjectId, ref: 'Device' })
   device_id: Types.ObjectId;
+
+  @Prop({ default: 80 })
+  speed_limit: number;
 }
 
 export const VehicleSchema = SchemaFactory.createForClass(Vehicle);

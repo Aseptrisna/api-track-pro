@@ -12,4 +12,5 @@ export class CreateVehicleDto {
   @ApiPropertyOptional() @IsOptional() @IsString() driver?: string;
   @ApiPropertyOptional({ enum: VehicleStatus }) @IsOptional() @IsEnum(VehicleStatus) status?: VehicleStatus;
   @ApiPropertyOptional() @IsOptional() @IsString() device_id?: string;
+  @ApiPropertyOptional({ description: 'Speed limit in km/h', default: 80 }) @IsOptional() @IsNumber() speed_limit?: number;
 }
