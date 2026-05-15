@@ -34,6 +34,12 @@ export class VehiclesController {
     return this.vehiclesService.findAll(user.userId, page || 1, limit || 10, search, type);
   }
 
+  @Get('compliance')
+  @ApiOperation({ summary: 'Get document & service compliance status for all vehicles' })
+  getCompliance(@CurrentUser() user: any) {
+    return this.vehiclesService.getComplianceReport(user.userId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get vehicle by ID' })
   findOne(@Param('id') id: string, @CurrentUser() user: any) {
