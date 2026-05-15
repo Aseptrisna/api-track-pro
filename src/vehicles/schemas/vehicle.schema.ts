@@ -54,6 +54,25 @@ export class Vehicle {
 
   @Prop({ default: 80 })
   speed_limit: number;
+
+  // ── Service schedule ──────────────────────────────────────────────────────
+  @Prop({ default: 0 })
+  odometer: number;
+
+  @Prop()
+  last_service_date: Date;
+
+  @Prop()
+  last_service_km: number;
+
+  @Prop()
+  next_service_date: Date;
+
+  @Prop()
+  next_service_km: number;
+
+  @Prop()
+  service_notes: string;
 }
 
 export const VehicleSchema = SchemaFactory.createForClass(Vehicle);

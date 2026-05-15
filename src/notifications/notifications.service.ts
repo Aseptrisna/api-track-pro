@@ -37,4 +37,40 @@ export class NotificationsService {
     const count = await this.notificationModel.countDocuments({ user: new Types.ObjectId(userId), read_status: false });
     return { count };
   }
+
+  async getAlertStats(userId: string, days = 30): Promise<{
+    total: number;
+    byType: { type: string; count: number }[];
+    dailyTrend: { date: string; count: number }[];
+  }> {
+    const since = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+    const uid = new Types.ObjectId(userId);
+    const filter = { user: uid, createdAt: { $gte: since } };
+
+    const [total, byType, dailyTrend] = await Promise.all([
+      this.notificationModel.countDocuments(filter),
+
+      this.notificationModel.aggregate([
+        { $match: filter },
+        { $group: { _id: '$type', count: { $sum: 1 } } },
+        { $project: { type: '$_id', count: 1, _id: 0 } },
+      ]),
+
+      this.notificationModel.aggregate([
+        { $match: filter },
+        {
+          $group: {
+            _id: {
+              $dateToString: { format: '%Y-%m-%d', date: '$createdAt' },
+            },
+            count: { $sum: 1 },
+          },
+        },
+        { $sort: { _id: 1 } },
+        { $project: { date: '$_id', count: 1, _id: 0 } },
+      ]),
+    ]);
+
+    return { total, byType, dailyTrend };
+  }
 }

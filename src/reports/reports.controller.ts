@@ -18,4 +18,7 @@ export class ReportsController {
 
   @Get('inventory') @ApiOperation({ summary: 'Inventory report' })
   inventoryReport(@Query('format') format?: string) { return this.reportsService.getInventoryReport(); }
+
+  @Get('fleet') @ApiOperation({ summary: 'Fleet summary report (vehicles + alerts)' })
+  fleetSummary(@CurrentUser() user: any) { return this.reportsService.getFleetSummary(user.userId); }
 }
