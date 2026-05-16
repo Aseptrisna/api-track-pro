@@ -39,7 +39,7 @@ export class Incident {
   @Prop({ enum: ['open', 'in-progress', 'resolved'], default: 'open' })
   status: IncidentStatus;
 
-  @Prop({ default: null }) resolved_at: Date | null;
+  @Prop({ type: Date, default: null }) resolved_at: Date | null;
 
   @Prop({ type: Types.ObjectId, ref: 'User', required: true, index: true })
   owner: Types.ObjectId;

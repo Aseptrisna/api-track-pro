@@ -36,7 +36,7 @@ export class RoutePlan {
   })
   status: RoutePlanStatus;
 
-  @Prop({ default: null }) completed_at: Date | null;
+  @Prop({ type: Date, default: null }) completed_at: Date | null;
 
   @Prop({ type: Types.ObjectId, ref: 'User', required: true, index: true })
   owner: Types.ObjectId;
