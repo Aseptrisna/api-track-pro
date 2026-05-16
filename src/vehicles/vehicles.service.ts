@@ -17,8 +17,8 @@ export class VehiclesService {
   // (handles existing DB documents that stored driver/device_id as empty strings)
   private stripInvalidRefs(docs: any[]): void {
     for (const doc of docs) {
-      if (doc.driver != null && !Types.isValid(String(doc.driver))) doc.driver = null;
-      if (doc.device_id != null && !Types.isValid(String(doc.device_id))) doc.device_id = null;
+      if (doc.driver != null && !Types.ObjectId.isValid(String(doc.driver))) doc.driver = null;
+      if (doc.device_id != null && !Types.ObjectId.isValid(String(doc.device_id))) doc.device_id = null;
     }
   }
 

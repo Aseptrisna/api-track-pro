@@ -47,7 +47,7 @@ export class Vehicle {
     type: Types.ObjectId,
     ref: 'Driver',
     default: null,
-    set: (v: any) => (v && Types.isValid(String(v)) ? new Types.ObjectId(String(v)) : null),
+    set: (v: any) => (v && Types.ObjectId.isValid(String(v)) ? new Types.ObjectId(String(v)) : null),
   })
   driver: Types.ObjectId | null;
 
@@ -58,7 +58,7 @@ export class Vehicle {
     type: Types.ObjectId,
     ref: 'Device',
     default: null,
-    set: (v: any) => (v && Types.isValid(String(v)) ? new Types.ObjectId(String(v)) : null),
+    set: (v: any) => (v && Types.ObjectId.isValid(String(v)) ? new Types.ObjectId(String(v)) : null),
   })
   device_id: Types.ObjectId | null;
 
