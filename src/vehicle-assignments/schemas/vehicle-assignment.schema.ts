@@ -1,8 +1,8 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document, Types } from 'mongoose';
+import { Types } from 'mongoose';
 
 @Schema({ timestamps: false, versionKey: false, collection: 'vehicle_assignments' })
-export class VehicleAssignment extends Document {
+export class VehicleAssignment {
   @Prop({ type: Types.ObjectId, ref: 'Vehicle', required: true, index: true })
   vehicle: Types.ObjectId;
 
