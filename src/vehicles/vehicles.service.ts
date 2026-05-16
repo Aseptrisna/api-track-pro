@@ -13,6 +13,15 @@ export class VehiclesService {
     return this.vehicleModel.create({ ...dto, owner: new Types.ObjectId(ownerId) });
   }
 
+  // Strip invalid ObjectId refs so Mongoose populate $in doesn't throw a cast error
+  // (handles existing DB documents that stored driver/device_id as empty strings)
+  private stripInvalidRefs(docs: any[]): void {
+    for (const doc of docs) {
+      if (doc.driver != null && !Types.isValid(String(doc.driver))) doc.driver = null;
+      if (doc.device_id != null && !Types.isValid(String(doc.device_id))) doc.device_id = null;
+    }
+  }
+
   async findAll(ownerId: string, page = 1, limit = 10, search?: string, type?: string) {
     const filter: any = { owner: new Types.ObjectId(ownerId) };
     if (search) filter.$or = [
@@ -21,16 +30,20 @@ export class VehiclesService {
     ];
     if (type) filter.vehicle_type = type;
     const skip = (page - 1) * limit;
-    const [data, total] = await Promise.all([
-      this.vehicleModel.find(filter).populate('driver').populate('device_id').skip(skip).limit(limit).sort({ createdAt: -1 }).exec(),
+    const [rawData, total] = await Promise.all([
+      this.vehicleModel.find(filter).skip(skip).limit(limit).sort({ createdAt: -1 }).lean().exec(),
       this.vehicleModel.countDocuments(filter),
     ]);
+    this.stripInvalidRefs(rawData as any[]);
+    const data = await this.vehicleModel.populate(rawData, [{ path: 'driver' }, { path: 'device_id' }]);
     return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async findById(id: string, ownerId: string): Promise<Vehicle> {
-    const v = await this.vehicleModel.findOne({ _id: id, owner: new Types.ObjectId(ownerId) }).populate('driver').populate('device_id');
-    if (!v) throw new NotFoundException('Vehicle not found');
+    const raw = await this.vehicleModel.findOne({ _id: id, owner: new Types.ObjectId(ownerId) }).lean().exec() as any;
+    if (!raw) throw new NotFoundException('Vehicle not found');
+    this.stripInvalidRefs([raw]);
+    const [v] = await this.vehicleModel.populate([raw], [{ path: 'driver' }, { path: 'device_id' }]) as any[];
     return v;
   }
 
@@ -54,7 +67,9 @@ export class VehiclesService {
   }
 
   async getAllByOwner(ownerId: string): Promise<Vehicle[]> {
-    return this.vehicleModel.find({ owner: new Types.ObjectId(ownerId) }).populate('driver').populate('device_id').exec();
+    const rawData = await this.vehicleModel.find({ owner: new Types.ObjectId(ownerId) }).lean().exec();
+    this.stripInvalidRefs(rawData as any[]);
+    return this.vehicleModel.populate(rawData, [{ path: 'driver' }, { path: 'device_id' }]) as unknown as Vehicle[];
   }
 
   async getComplianceReport(ownerId: string) {
@@ -146,6 +161,8 @@ export class VehiclesService {
   }
 
   async getAll(): Promise<Vehicle[]> {
-    return this.vehicleModel.find().populate('driver').populate('device_id').exec();
+    const rawData = await this.vehicleModel.find().lean().exec();
+    this.stripInvalidRefs(rawData as any[]);
+    return this.vehicleModel.populate(rawData, [{ path: 'driver' }, { path: 'device_id' }]) as unknown as Vehicle[];
   }
 }

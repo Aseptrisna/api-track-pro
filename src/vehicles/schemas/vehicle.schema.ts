@@ -43,14 +43,24 @@ export class Vehicle {
   @Prop()
   year: number;
 
-  @Prop({ type: Types.ObjectId, ref: 'Driver' })
-  driver: Types.ObjectId;
+  @Prop({
+    type: Types.ObjectId,
+    ref: 'Driver',
+    default: null,
+    set: (v: any) => (v && Types.isValid(String(v)) ? new Types.ObjectId(String(v)) : null),
+  })
+  driver: Types.ObjectId | null;
 
   @Prop({ enum: VehicleStatus, default: VehicleStatus.ACTIVE })
   status: VehicleStatus;
 
-  @Prop({ type: Types.ObjectId, ref: 'Device' })
-  device_id: Types.ObjectId;
+  @Prop({
+    type: Types.ObjectId,
+    ref: 'Device',
+    default: null,
+    set: (v: any) => (v && Types.isValid(String(v)) ? new Types.ObjectId(String(v)) : null),
+  })
+  device_id: Types.ObjectId | null;
 
   @Prop({ default: 80 })
   speed_limit: number;
