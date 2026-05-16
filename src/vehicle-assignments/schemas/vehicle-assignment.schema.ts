@@ -15,7 +15,7 @@ export class VehicleAssignment {
   @Prop({ type: Types.ObjectId, ref: 'Driver', default: null })
   driver: Types.ObjectId | null;
 
-  @Prop({ default: null })
+  @Prop({ type: String, default: null })
   driver_name: string | null;
 
   @Prop({ type: String, enum: ['assigned', 'unassigned'], required: true })
