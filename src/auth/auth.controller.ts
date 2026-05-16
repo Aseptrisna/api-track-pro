@@ -59,6 +59,7 @@ export class AuthController {
   @Get('profile')
   @ApiOperation({ summary: 'Get current user profile' })
   getProfile(@CurrentUser() user: any) {
-    return this.authService.getProfile(user.userId);
+    // Use actualUserId so team members get their own profile, not the owner's
+    return this.authService.getProfile(user.actualUserId ?? user.userId);
   }
 }

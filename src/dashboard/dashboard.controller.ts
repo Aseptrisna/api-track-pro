@@ -1,5 +1,5 @@
-import { Controller, Get } from '@nestjs/common';
-import { ApiBearerAuth, ApiTags, ApiOperation } from '@nestjs/swagger';
+import { Controller, Get, Query } from '@nestjs/common';
+import { ApiBearerAuth, ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { DashboardService } from './dashboard.service';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 
@@ -20,4 +20,11 @@ export class DashboardController {
 
   @Get('shipment-analytics') @ApiOperation({ summary: 'Get shipment analytics' })
   getShipmentAnalytics() { return this.dashboardService.getShipmentAnalytics(); }
+
+  @Get('utilization')
+  @ApiOperation({ summary: 'Get fleet utilization analytics' })
+  @ApiQuery({ name: 'days', required: false, description: 'Number of days to look back (default 30)' })
+  getUtilization(@CurrentUser() user: any, @Query('days') days?: string) {
+    return this.dashboardService.getUtilization(user.userId, days ? Number(days) : 30);
+  }
 }

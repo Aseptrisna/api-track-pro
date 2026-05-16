@@ -8,6 +8,8 @@ import { VehiclesModule } from '../vehicles/vehicles.module';
 import { TrackingModule } from '../tracking/tracking.module';
 import { GeofenceModule } from '../geofence/geofence.module';
 import { ViolationsModule } from '../violations/violations.module';
+import { AlertRulesModule } from '../alert-rules/alert-rules.module';
+import { IdleLogsModule } from '../idle-logs/idle-logs.module';
 
 @Module({
   imports: [
@@ -17,6 +19,8 @@ import { ViolationsModule } from '../violations/violations.module';
     TrackingModule,
     GeofenceModule,
     ViolationsModule,
+    AlertRulesModule,
+    IdleLogsModule,
   ],
   controllers: [GpsDataController],
   providers: [GpsDataService],

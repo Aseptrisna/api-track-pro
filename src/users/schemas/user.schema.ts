@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
 
 export enum UserRole {
   ADMIN = 'admin',
@@ -39,6 +39,10 @@ export class User extends Document {
 
   @Prop({ default: true })
   isActive: boolean;
+
+  /** Set for team members — points to the fleet owner's _id */
+  @Prop({ type: Types.ObjectId, ref: 'User', default: null, index: true })
+  owner_ref: Types.ObjectId | null;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

@@ -46,6 +46,27 @@ export class FuelLogsController {
     return this.fuelLogsService.getStats(user.userId, vehicleId);
   }
 
+  @Get('efficiency')
+  @ApiOperation({ summary: 'Get fuel efficiency (km/L) per vehicle' })
+  @ApiQuery({ name: 'vehicleId', required: false })
+  getEfficiency(@CurrentUser() user: any, @Query('vehicleId') vehicleId?: string) {
+    return this.fuelLogsService.getEfficiency(user.userId, vehicleId);
+  }
+
+  @Get('emissions')
+  @ApiOperation({ summary: 'Get CO₂ emissions data from fuel consumption' })
+  @ApiQuery({ name: 'vehicleId', required: false })
+  @ApiQuery({ name: 'year',      required: false })
+  getEmissions(
+    @CurrentUser() user: any,
+    @Query('vehicleId') vehicleId?: string,
+    @Query('year')      year?: string,
+  ) {
+    return this.fuelLogsService.getEmissions(
+      user.userId, vehicleId, year ? parseInt(year, 10) : undefined,
+    );
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get fuel log by ID' })
   findOne(@Param('id') id: string) {

@@ -54,6 +54,15 @@ export class MailService {
     });
   }
 
+  async sendReport(to: string, subject: string, html: string) {
+    await this.transporter.sendMail({
+      from: this.configService.get('MAIL_FROM', 'noreply@fleetmonitor.com'),
+      to,
+      subject,
+      html,
+    });
+  }
+
   async sendAlertEmail(email: string, subject: string, message: string) {
     await this.transporter.sendMail({
       from: this.configService.get('MAIL_FROM', 'noreply@fleetmonitor.com'),

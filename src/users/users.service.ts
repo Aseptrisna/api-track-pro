@@ -1,10 +1,17 @@
-import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
+import { Model, Types } from 'mongoose';
 import * as bcrypt from 'bcrypt';
-import { User } from './schemas/user.schema';
+import { User, UserRole } from './schemas/user.schema';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
+
+export interface CreateTeamMemberDto {
+  name:     string;
+  email:    string;
+  password: string;
+  role:     UserRole.MANAGER | UserRole.VIEWER;
+}
 
 @Injectable()
 export class UsersService {
@@ -86,5 +93,53 @@ export class UsersService {
       passwordResetToken: null,
       passwordResetExpires: null,
     });
+  }
+
+  // ── Team member management ─────────────────────────────────────────────────
+
+  async findTeamMembers(ownerId: string) {
+    return this.userModel
+      .find({ owner_ref: new Types.ObjectId(ownerId) })
+      .select('-password')
+      .sort({ createdAt: -1 })
+      .lean();
+  }
+
+  async createTeamMember(ownerId: string, dto: CreateTeamMemberDto): Promise<User> {
+    const exists = await this.userModel.findOne({ email: dto.email });
+    if (exists) throw new ConflictException('Email already exists');
+    const hashedPassword = await bcrypt.hash(dto.password, 10);
+    return this.userModel.create({
+      name:            dto.name,
+      email:           dto.email,
+      password:        hashedPassword,
+      role:            dto.role,
+      owner_ref:       new Types.ObjectId(ownerId),
+      isEmailVerified: true,   // owner-created accounts skip email verification
+    });
+  }
+
+  async updateTeamMember(
+    memberId: string,
+    ownerId:  string,
+    dto: { role?: UserRole; isActive?: boolean; name?: string },
+  ): Promise<User> {
+    const member = await this.userModel.findById(memberId);
+    if (!member) throw new NotFoundException('Team member not found');
+    if (!member.owner_ref || member.owner_ref.toString() !== ownerId) {
+      throw new ForbiddenException('Not your team member');
+    }
+    Object.assign(member, dto);
+    await member.save();
+    return member;
+  }
+
+  async removeTeamMember(memberId: string, ownerId: string): Promise<void> {
+    const member = await this.userModel.findById(memberId);
+    if (!member) throw new NotFoundException('Team member not found');
+    if (!member.owner_ref || member.owner_ref.toString() !== ownerId) {
+      throw new ForbiddenException('Not your team member');
+    }
+    await member.deleteOne();
   }
 }

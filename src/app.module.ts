@@ -25,6 +25,14 @@ import { ActivityLogModule } from './activity-log/activity-log.module';
 import { FuelLogsModule } from './fuel-logs/fuel-logs.module';
 import { MaintenanceModule } from './maintenance/maintenance.module';
 import { ViolationsModule } from './violations/violations.module';
+import { AlertRulesModule } from './alert-rules/alert-rules.module';
+import { VehicleAssignmentsModule } from './vehicle-assignments/vehicle-assignments.module';
+import { IdleLogsModule } from './idle-logs/idle-logs.module';
+import { ReportSchedulesModule } from './report-schedules/report-schedules.module';
+import { TeamModule } from './team/team.module';
+import { ExpensesModule } from './expenses/expenses.module';
+import { IncidentsModule }   from './incidents/incidents.module';
+import { RoutePlansModule }  from './route-plans/route-plans.module';
 
 @Module({
   imports: [
@@ -53,6 +61,14 @@ import { ViolationsModule } from './violations/violations.module';
     FuelLogsModule,
     MaintenanceModule,
     ViolationsModule,
+    AlertRulesModule,
+    VehicleAssignmentsModule,
+    IdleLogsModule,
+    ReportSchedulesModule,
+    TeamModule,
+    ExpensesModule,
+    IncidentsModule,
+    RoutePlansModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

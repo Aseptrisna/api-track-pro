@@ -9,13 +9,28 @@ import { TrackingGateway } from '../tracking/tracking.gateway';
 import { GeofenceService } from '../geofence/geofence.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { ViolationsService } from '../violations/violations.service';
+import { AlertRulesService } from '../alert-rules/alert-rules.service';
+import { IdleLogsService } from '../idle-logs/idle-logs.service';
 
-const DEFAULT_SPEED_LIMIT = 80; // km/h
-const SPEED_ALERT_COOLDOWN_MS = 10 * 60 * 1000; // 10 minutes per device
+const DEFAULT_SPEED_LIMIT  = 80;               // km/h
+const DEFAULT_COOLDOWN_MS  = 10 * 60 * 1000;  // 10 minutes
+const IDLE_SPEED_KMH       = 3;               // below this = idle
+const IDLE_MIN_LOG_MIN     = 2;               // minimum idle minutes to log to DB
+const IDLE_NOTIFY_MIN      = 10;              // idle minutes before notifying
+const IDLE_NOTIFY_COOL_MS  = 30 * 60 * 1000; // 30-minute cooldown between idle notifications
+
+interface IdleState {
+  start:           Date;
+  lat:             number;
+  lng:             number;
+  notified:        boolean;
+  lastNotifiedAt:  number;
+}
 
 @Injectable()
 export class GpsDataService {
   private readonly speedAlertCooldown = new Map<string, number>();
+  private readonly idleState          = new Map<string, IdleState>();
 
   constructor(
     @InjectModel(GpsData.name) private gpsDataModel: Model<GpsData>,
@@ -25,6 +40,8 @@ export class GpsDataService {
     private geofenceService: GeofenceService,
     private notificationsService: NotificationsService,
     private violationsService: ViolationsService,
+    private alertRulesService: AlertRulesService,
+    private idleLogsService: IdleLogsService,
   ) {}
 
   async create(dto: CreateGpsDataDto): Promise<GpsData> {
@@ -64,6 +81,9 @@ export class GpsDataService {
 
       this.checkSpeedViolation(device, saved.speed || 0, saved)
         .catch(() => { /* non-blocking */ });
+
+      this.checkIdleState(device, saved)
+        .catch(() => { /* non-blocking */ });
     }
 
     return saved;
@@ -76,30 +96,39 @@ export class GpsDataService {
   ): Promise<void> {
     if (speed <= 0) return;
 
-    const vehicle = device.vehicle_id as any;
-    const speedLimit: number = vehicle?.speed_limit ?? DEFAULT_SPEED_LIMIT;
+    const vehicle  = device.vehicle_id as any;
+    const vehicleId = vehicle?._id?.toString() ?? vehicle?.toString() ?? null;
+    const ownerId   = device.owner?.toString();
 
-    if (speed <= speedLimit) return;
+    // Load alert rule (null = use defaults)
+    const rule = vehicleId ? await this.alertRulesService.findByVehicleId(vehicleId) : null;
 
-    const ownerId = device.owner?.toString();
+    // If speed alerts are disabled for this vehicle, skip entirely
+    if (rule && rule.speed_alert_enabled === false) return;
+
+    const baseLimit: number    = vehicle?.speed_limit ?? DEFAULT_SPEED_LIMIT;
+    const effectiveLimit: number = rule?.speed_limit_override ?? baseLimit;
+
+    if (speed <= effectiveLimit) return;
 
     // Always persist a violation record (per GPS point over limit)
     await this.violationsService
       .log({
-        vehicle: vehicle?._id?.toString() ?? vehicle?.toString(),
-        imei: device.imei,
+        vehicle: vehicleId,
+        imei:    device.imei,
         timestamp: savedPoint.timestamp,
         speed,
-        speed_limit: speedLimit,
-        latitude: savedPoint.latitude,
+        speed_limit: effectiveLimit,
+        latitude:  savedPoint.latitude,
         longitude: savedPoint.longitude,
         owner: ownerId,
       })
       .catch(() => null);
 
-    // Cooldown: throttle notifications to once per 10 minutes per device
-    const lastAlert = this.speedAlertCooldown.get(device.imei) ?? 0;
-    if (Date.now() - lastAlert < SPEED_ALERT_COOLDOWN_MS) return;
+    // Cooldown: throttle notifications per vehicle
+    const cooldownMs = ((rule?.cooldown_minutes ?? 10)) * 60 * 1000;
+    const lastAlert  = this.speedAlertCooldown.get(device.imei) ?? 0;
+    if (Date.now() - lastAlert < cooldownMs) return;
 
     this.speedAlertCooldown.set(device.imei, Date.now());
 
@@ -109,17 +138,84 @@ export class GpsDataService {
 
     await this.notificationsService.create({
       title: 'Speed limit exceeded',
-      message: `${vehicleLabel} is travelling at ${speed} km/h, exceeding the ${speedLimit} km/h limit.`,
+      message: `${vehicleLabel} is travelling at ${speed} km/h, exceeding the ${effectiveLimit} km/h limit.`,
       type: 'warning',
       user: ownerId,
     });
 
-    this.trackingGateway.emitAlert({
-      event: 'speed_violation',
-      imei: device.imei,
-      speed,
-      speedLimit,
-    });
+    this.trackingGateway.emitAlert({ event: 'speed_violation', imei: device.imei, speed, speedLimit: effectiveLimit });
+  }
+
+  private async checkIdleState(device: any, point: GpsData): Promise<void> {
+    const imei    = device.imei;
+    const speed   = point.speed || 0;
+    const now     = point.timestamp instanceof Date ? point.timestamp : new Date(point.timestamp);
+    const vehicle = device.vehicle_id as any;
+    const vehicleId = vehicle?._id?.toString() ?? vehicle?.toString() ?? null;
+    const ownerId   = device.owner?.toString();
+    if (!ownerId) return;
+
+    const vehicleLabel = vehicle?.plate_number
+      ? `${vehicle.vehicle_name} (${vehicle.plate_number})`
+      : `Device ${imei}`;
+
+    if (speed < IDLE_SPEED_KMH) {
+      // ── Vehicle is idle ────────────────────────────────────────────────────
+      if (!this.idleState.has(imei)) {
+        this.idleState.set(imei, {
+          start:          now,
+          lat:            point.latitude,
+          lng:            point.longitude,
+          notified:       false,
+          lastNotifiedAt: 0,
+        });
+        return;
+      }
+
+      const state = this.idleState.get(imei)!;
+      const idleMin = (now.getTime() - state.start.getTime()) / 60_000;
+
+      // Notify when threshold exceeded (with repeat cooldown)
+      if (idleMin >= IDLE_NOTIFY_MIN) {
+        const sinceLastNotify = Date.now() - state.lastNotifiedAt;
+        if (!state.notified || sinceLastNotify >= IDLE_NOTIFY_COOL_MS) {
+          state.notified       = true;
+          state.lastNotifiedAt = Date.now();
+
+          await this.notificationsService.create({
+            title:   'Vehicle idle',
+            message: `${vehicleLabel} has been idle for ${Math.round(idleMin)} minutes.`,
+            type:    'info',
+            user:    ownerId,
+          });
+          this.trackingGateway.emitAlert({
+            event:           'idle',
+            imei,
+            durationMinutes: Math.round(idleMin),
+          });
+        }
+      }
+    } else {
+      // ── Vehicle started moving — close idle session ────────────────────────
+      if (!this.idleState.has(imei)) return;
+
+      const state   = this.idleState.get(imei)!;
+      const idleMin = (now.getTime() - state.start.getTime()) / 60_000;
+      this.idleState.delete(imei);
+
+      if (idleMin >= IDLE_MIN_LOG_MIN) {
+        await this.idleLogsService.log({
+          vehicle_id:       vehicleId,
+          imei,
+          start_time:       state.start,
+          end_time:         now,
+          duration_minutes: Math.round(idleMin),
+          latitude:         state.lat,
+          longitude:        state.lng,
+          owner:            ownerId,
+        });
+      }
+    }
   }
 
   private async checkGeofenceTransitions(
@@ -128,51 +224,52 @@ export class GpsDataService {
     lat: number,
     lng: number,
   ): Promise<void> {
-    const geofences = await this.geofenceService.findAll();
-    if (!geofences.length) return;
+    const allFences = await this.geofenceService.findAll();
+    if (!allFences.length) return;
 
+    const vehicleId = (device.vehicle_id as any)?._id?.toString()
+      ?? (device.vehicle_id as any)?.toString()
+      ?? null;
     const ownerId = device.owner?.toString();
-    const label = (device as any).vehicle_id
-      ? `vehicle linked to ${device.imei}`
-      : `device ${device.imei}`;
 
-    for (const fence of geofences) {
-      const nowInside = this.geofenceService.isPointInPolygon(
-        lat, lng, fence.polygon_coordinates,
-      );
+    // Load alert rule to determine which fences to monitor and which events to fire
+    const rule = vehicleId ? await this.alertRulesService.findByVehicleId(vehicleId) : null;
 
+    // Filter fences: if monitored_geofences is non-empty, only check those
+    const fences = (rule?.monitored_geofences?.length)
+      ? allFences.filter((f: any) =>
+          rule!.monitored_geofences.some((id) => id.toString() === f._id.toString()),
+        )
+      : allFences;
+
+    if (!fences.length) return;
+
+    const label = vehicleId ? `vehicle linked to ${device.imei}` : `device ${device.imei}`;
+
+    for (const fence of fences) {
+      const nowInside = this.geofenceService.isPointInPolygon(lat, lng, fence.polygon_coordinates);
       const prevInside = prevData
-        ? this.geofenceService.isPointInPolygon(
-            prevData.latitude, prevData.longitude, fence.polygon_coordinates,
-          )
+        ? this.geofenceService.isPointInPolygon(prevData.latitude, prevData.longitude, fence.polygon_coordinates)
         : false;
 
       if (!prevInside && nowInside) {
-        // Entered geofence
+        if (rule && rule.geofence_enter_enabled === false) continue;
         await this.notificationsService.create({
-          title: `Entered geofence: ${fence.name}`,
+          title:   `Entered geofence: ${fence.name}`,
           message: `A ${label} has entered the "${fence.name}" zone.`,
-          type: fence.type === 'restricted' ? 'alert' : 'info',
-          user: ownerId,
+          type:    fence.type === 'restricted' ? 'alert' : 'info',
+          user:    ownerId,
         });
-        this.trackingGateway.emitAlert({
-          event: 'geofence_enter',
-          geofence: fence.name,
-          imei: device.imei,
-        });
+        this.trackingGateway.emitAlert({ event: 'geofence_enter', geofence: fence.name, imei: device.imei });
       } else if (prevInside && !nowInside) {
-        // Exited geofence
+        if (rule && rule.geofence_exit_enabled === false) continue;
         await this.notificationsService.create({
-          title: `Exited geofence: ${fence.name}`,
+          title:   `Exited geofence: ${fence.name}`,
           message: `A ${label} has exited the "${fence.name}" zone.`,
-          type: fence.type === 'restricted' ? 'alert' : 'warning',
-          user: ownerId,
+          type:    fence.type === 'restricted' ? 'alert' : 'warning',
+          user:    ownerId,
         });
-        this.trackingGateway.emitAlert({
-          event: 'geofence_exit',
-          geofence: fence.name,
-          imei: device.imei,
-        });
+        this.trackingGateway.emitAlert({ event: 'geofence_exit', geofence: fence.name, imei: device.imei });
       }
     }
   }

@@ -30,6 +30,11 @@ export class DriversController {
     return this.driversService.findAll(page || 1, limit || 10, search);
   }
 
+  @Get('performance') @ApiOperation({ summary: 'Driver performance scores' })
+  getPerformance(@CurrentUser() user: any, @Query('days') days?: string) {
+    return this.driversService.getPerformance(user.userId, days ? Number(days) : 30);
+  }
+
   @Get(':id') @ApiOperation({ summary: 'Get driver by ID' })
   findOne(@Param('id') id: string) { return this.driversService.findById(id); }
 

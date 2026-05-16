@@ -40,6 +40,12 @@ export class VehiclesController {
     return this.vehiclesService.getComplianceReport(user.userId);
   }
 
+  @Get('calendar')
+  @ApiOperation({ summary: 'Get maintenance & document calendar events for all vehicles' })
+  getCalendar(@CurrentUser() user: any) {
+    return this.vehiclesService.getCalendar(user.userId);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Get vehicle by ID' })
   findOne(@Param('id') id: string, @CurrentUser() user: any) {
